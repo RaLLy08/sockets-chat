@@ -1,9 +1,19 @@
-package models;
+package src.server.models;
 import java.util.*;
 
 
 public class Rooms {
     private Map<String, Room> rooms;
+
+    static public class Room extends ArrayList<User> {
+        int id;
+        String name;
+    
+        public Room(String name) {
+            this.id = UUID.randomUUID().hashCode();
+            this.name = name;
+        }
+    }
     
     public Rooms() {
         rooms = new HashMap<String, Room>();
