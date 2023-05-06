@@ -5,22 +5,6 @@ import java.util.*;
 import java.io.*;
 
 import src.dto.MessageDto;
-import src.server.service.RoomService;
-
-
-class ClientController {
-   private Set<ClientHandler> clientHandlers = new HashSet<>();
-
-   ClientController() {
-
-   }
-
-
-   public void addClientHandler(ClientHandler clientHandler) {
-      this.clientHandlers.add(clientHandler);
-   }
-
-}
 
 public class Server extends Thread {
    public static void main(String [] args) {
@@ -28,7 +12,6 @@ public class Server extends Thread {
 
       new Server(port);
    }
-
    Server(int port) {
       try (ServerSocket serverSocket = new ServerSocket(port)) {
          System.out.println(
@@ -53,98 +36,138 @@ public class Server extends Thread {
          e.printStackTrace();
       }
    }
-}
+   
+   private class ClientHandler extends Thread {
+      static Map<
+         String, 
+         HashSet<ClientHandler>
+      > clientHandlersRooms = new HashMap<>();
+      private Socket socket;
+      private ObjectInputStream in;
+      private ObjectOutputStream out;
+      private String room;
 
+      ClientHandler(
+         Socket socket
+      ) throws IOException {
+         this.socket = socket;
+         InputStream socketInputStream = socket.getInputStream();
+         this.in = new ObjectInputStream(
+            socketInputStream
+         );
+         
+         OutputStream socketOutputStream = socket.getOutputStream();
+         this.out = new ObjectOutputStream(
+            socketOutputStream
+         );
+      }
 
-class ClientHandler extends Thread {
-   static Set<ClientHandler> clientHandlers = new HashSet<>();
-   private Socket socket;
-   private ObjectInputStream in;
-   private ObjectOutputStream out;
-   private String room;
+      private HashSet<ClientHandler> getClientHandlers() {
+         if (this.room == null) {
+            throw new RuntimeException("Room is not set");
+         }
 
-   ClientHandler(
-      Socket socket
-   ) throws IOException {
-      this.socket = socket;
-      InputStream socketInputStream = socket.getInputStream();
-      this.in = new ObjectInputStream(
-         socketInputStream
-      );
-      
-      OutputStream socketOutputStream = socket.getOutputStream();
-      this.out = new ObjectOutputStream(
-         socketOutputStream
-      );
-   }
+         return ClientHandler.clientHandlersRooms.get(this.room);
+      }
 
-   void broadcast(String message) {
-      System.out.println("Broadcasting message: " + clientHandlers.size());
+      void broadcast(String message) {
+         HashSet<ClientHandler> roomClientHandlers = this.getClientHandlers();
 
-      for (ClientHandler clientHandler : clientHandlers) {
-         if (clientHandler != this) {
-            clientHandler.sendMessage(message);
+         for (ClientHandler clientHandler : roomClientHandlers) {
+            if (clientHandler != this) {
+               clientHandler.sendMessage(message);
+            }
          }
       }
-   }
 
-   void sendMessage(String text) {
-      try {
-         System.out.println("Sending message to client: " + text);
-         MessageDto messageDto = new MessageDto(null, text);
+      void addClientHandlerToRoom() {
+         HashSet<ClientHandler> roomClientHandlers = this.getClientHandlers();
 
-         this.out.writeObject(messageDto);
-      } catch (IOException e) {
-         e.printStackTrace();
-      }
-   }
+         if (roomClientHandlers == null) {
+            System.out.println("New room has been created: " + room);
 
-   void setRoom(String room) {
-      this.room = room;
-   }
-
-   boolean checkRoom(String room) {
-      return this.room == room;
-   }
-
-   @Override
-   public void run() {
-      System.out.println("Connected to: " + this.socket.getRemoteSocketAddress());
-
-      clientHandlers.add((ClientHandler) this);
-
-      while (true) {
-
-         try {
-            MessageDto messageDto = (MessageDto) this.in.readObject();
-
-            this.setRoom(messageDto.room);
-
-            System.out.println(
-               messageDto.text
+            roomClientHandlers = new HashSet<>();
+         } else {
+            String message = String.format(
+               "New Client Jointed to %s room\nNumber of users in room: %d", 
+               room, roomClientHandlers.size()
             );
 
-            this.broadcast(messageDto.text);
+            System.out.println(message);
+         }
 
-         } catch (IOException | ClassNotFoundException e) {
-            this.close();
-            break;
+         roomClientHandlers.add(this);
+
+         clientHandlersRooms.put(this.room, roomClientHandlers);
+      }
+
+      void removeClientHandlerFromRoom() {
+         HashSet<ClientHandler> roomClientHandlers = this.getClientHandlers();
+
+         if (roomClientHandlers == null) {
+            return;
+         }
+
+         roomClientHandlers.remove(this);
+
+         clientHandlersRooms.put(this.room, roomClientHandlers);
+      }
+
+      void sendMessage(String text) {
+         try {
+            System.out.println("Sending message to client: " + text);
+            MessageDto messageDto = new MessageDto(null, text);
+
+            this.out.writeObject(messageDto);
+         } catch (IOException e) {
+            e.printStackTrace();
          }
       }
 
-   }
+      void setRoom(String room) {
+         this.room = room;
+      }
 
-   public void close() {
-      try {
-         System.out.println("Client disconnected. " + this.socket.getRemoteSocketAddress());
+      @Override
+      public void run() {
+         System.out.println("Connected to: " + this.socket.getRemoteSocketAddress());
 
-         clientHandlers.remove(this);
+         while (true) {
+            try {
+               MessageDto messageDto = (MessageDto) this.in.readObject();
 
-         this.in.close();
-         this.out.close();
-         this.socket.close();
-      } catch (IOException e) {
-         e.printStackTrace();
+               if (this.room == null) {
+                  this.setRoom(messageDto.room);
+                  this.addClientHandlerToRoom();
+               }
+
+               System.out.println(
+                  messageDto.text
+               );
+
+               this.broadcast(messageDto.text);
+
+            } catch (IOException | ClassNotFoundException e) {
+               this.close();
+               break;
+            }
+         }
+
+      }
+
+      public void close() {
+         try {
+            System.out.println("Client disconnected. " + this.socket.getRemoteSocketAddress());
+
+            this.removeClientHandlerFromRoom();
+
+            this.in.close();
+            this.out.close();
+            this.socket.close();
+         } catch (IOException e) {
+            e.printStackTrace();
+         }
       }
    }
 }
+
