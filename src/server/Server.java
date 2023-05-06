@@ -1,22 +1,29 @@
 package src.server;
+
 import java.net.*;
 import java.util.*;
-
-import src.dto.MessageDto;
-import src.server.services.RoomService;
-
 import java.io.*;
 
+import src.dto.MessageDto;
+import src.server.service.RoomService;
 
+
+class ClientController {
+   private Set<ClientHandler> clientHandlers = new HashSet<>();
+
+   ClientController() {
+
+   }
+
+
+   public void addClientHandler(ClientHandler clientHandler) {
+      this.clientHandlers.add(clientHandler);
+   }
+
+}
 
 public class Server extends Thread {
-   private Set<ClientHandler> clientHandlers = new HashSet<>();
    public static void main(String [] args) {
-      if (args.length < 1) {
-         System.out.println("Syntax: java Server <port>");
-         System.exit(0);
-     }
-
       int port = Integer.parseInt(args[0]);
 
       new Server(port);
@@ -25,7 +32,7 @@ public class Server extends Thread {
    Server(int port) {
       try (ServerSocket serverSocket = new ServerSocket(port)) {
          System.out.println(
-            "Server started" + 
+            "Server started on port: " + 
             serverSocket.getLocalPort()
          );
 
@@ -34,15 +41,10 @@ public class Server extends Thread {
                
             System.out.println("Client connected: " + socket.getRemoteSocketAddress());
            
-            RoomService roomService = new RoomService();
-
             Thread clientHandler = new ClientHandler(
-               socket,
-               roomService
+               socket
             );
    
-            this.clientHandlers.add((ClientHandler) clientHandler);
-            
             clientHandler.start();
          }
 
@@ -55,44 +57,78 @@ public class Server extends Thread {
 
 
 class ClientHandler extends Thread {
+   static Set<ClientHandler> clientHandlers = new HashSet<>();
    private Socket socket;
    private ObjectInputStream in;
-   private DataOutputStream out;
-   private RoomService roomService;
+   private ObjectOutputStream out;
+   private String room;
 
-   ClientHandler(Socket socket, RoomService roomService) throws IOException {
+   ClientHandler(
+      Socket socket
+   ) throws IOException {
       this.socket = socket;
-      this.roomService = roomService;
-
       InputStream socketInputStream = socket.getInputStream();
       this.in = new ObjectInputStream(
          socketInputStream
       );
       
       OutputStream socketOutputStream = socket.getOutputStream();
-      this.out = new DataOutputStream(
+      this.out = new ObjectOutputStream(
          socketOutputStream
       );
    }
 
+   void broadcast(String message) {
+      System.out.println("Broadcasting message: " + clientHandlers.size());
+
+      for (ClientHandler clientHandler : clientHandlers) {
+         if (clientHandler != this) {
+            clientHandler.sendMessage(message);
+         }
+      }
+   }
+
+   void sendMessage(String text) {
+      try {
+         System.out.println("Sending message to client: " + text);
+         MessageDto messageDto = new MessageDto(null, text);
+
+         this.out.writeObject(messageDto);
+      } catch (IOException e) {
+         e.printStackTrace();
+      }
+   }
+
+   void setRoom(String room) {
+      this.room = room;
+   }
+
+   boolean checkRoom(String room) {
+      return this.room == room;
+   }
+
+   @Override
    public void run() {
       System.out.println("Connected to: " + this.socket.getRemoteSocketAddress());
+
+      clientHandlers.add((ClientHandler) this);
 
       while (true) {
 
          try {
             MessageDto messageDto = (MessageDto) this.in.readObject();
 
-            // String message = this.in.readUTF();
-            System.out.println(messageDto);
+            this.setRoom(messageDto.room);
 
+            System.out.println(
+               messageDto.text
+            );
 
-         } catch (IOException e) {
+            this.broadcast(messageDto.text);
+
+         } catch (IOException | ClassNotFoundException e) {
             this.close();
-            e.printStackTrace();
             break;
-         } catch (ClassNotFoundException e) {
-            e.printStackTrace();
          }
       }
 
@@ -101,6 +137,8 @@ class ClientHandler extends Thread {
    public void close() {
       try {
          System.out.println("Client disconnected. " + this.socket.getRemoteSocketAddress());
+
+         clientHandlers.remove(this);
 
          this.in.close();
          this.out.close();

@@ -1,4 +1,5 @@
 package src.client;
+
 import java.net.*;
 
 import src.dto.MessageDto;
@@ -9,24 +10,28 @@ import java.io.*;
 public class Client {
    Socket socket;
    BufferedReader br;  
-   MessageDto messageDto;
+   String room;
 
    public void consumeMessages() {
       System.out.println("MessageConsumerThread started");
 
-      // try {
-      //    InputStream inFromServer = this.socket.getInputStream();
-      //    ObjectInputStream in = new ObjectInputStream(inFromServer);
+      try {
+         InputStream inFromServer = this.socket.getInputStream();
+         ObjectInputStream in = new ObjectInputStream(inFromServer);
       
-      //    while (true) {
-      //       System.out.println(
-      //          in.read()
-      //       );
-      //    }
+         while (true) {
+            MessageDto messageDto = (MessageDto) in.readObject();
 
-      // } catch (IOException e) {
-      //    e.printStackTrace();
-      // }
+            System.out.println(
+               messageDto.text
+            );
+         }
+
+      } catch (IOException e) {
+         e.printStackTrace();
+      } catch (ClassNotFoundException e) {
+         e.printStackTrace();
+      }
 
    }
 
@@ -47,9 +52,9 @@ public class Client {
             System.out.print("Enter text: ");
             String text = br.readLine();
 
-            this.messageDto.text = text;
-
-            out.writeObject(this.messageDto);
+            out.writeObject(
+               new MessageDto(this.room, text)
+            );
          }
 
          // socket.close();
@@ -64,7 +69,7 @@ public class Client {
          host,
          port
       );
-      this.messageDto = new MessageDto(room);
+      this.room = room;
    }
 
 
@@ -78,7 +83,7 @@ public class Client {
             new InputStreamReader(System.in)
          );
 
-         System.out.print("Write room name");
+         System.out.print("Write room name: ");
          String roomName = br.readLine();
 
          Client client = new Client(
