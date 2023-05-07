@@ -6,6 +6,10 @@ import src.dto.MessageDto;
 
 import java.io.*;
 
+class ChatCommands {
+   static final String JOIN = "/join";
+   static final String QUIT = "/quit";
+}
 
 public class Client {
    Socket socket;
@@ -22,9 +26,7 @@ public class Client {
          while (true) {
             MessageDto messageDto = (MessageDto) in.readObject();
 
-            System.out.println(
-               messageDto.text
-            );
+            this.handleMessage(messageDto);
          }
 
       } catch (IOException e) {
@@ -47,13 +49,39 @@ public class Client {
          br = new BufferedReader(
             new InputStreamReader(System.in)
          );
+         System.out.print("Enter text to send message to the lobby\nWrite '/connect <room>' to connect or create the room.\n");
 
          while (true) {
-            System.out.print("Enter text: ");
             String text = br.readLine();
 
+            if (text == null) continue;
+
+            MessageDto messageDto;
+
+            String[] parts = text.split("\\s+");
+
+            if (parts[0].equals("/connect")) {
+               this.room = parts[1];
+
+               messageDto = new MessageDto(
+                  this.room,
+                  MessageDto.Action.JOIN
+               );
+            } else if (parts[0].equals("/leave")) {
+               messageDto = new MessageDto(
+                  this.room,
+                  MessageDto.Action.LEAVE
+               );
+            } else {
+               messageDto = new MessageDto(
+                  this.room,
+                  text,
+                  MessageDto.Action.MESSAGE
+               );
+            }
+
             out.writeObject(
-               new MessageDto(this.room, text)
+               messageDto
             );
          }
 
@@ -61,6 +89,20 @@ public class Client {
       } catch (IOException e) {
          e.printStackTrace();
       }
+   }
+
+   void handleMessage(MessageDto messageDto) {
+
+      if (messageDto.action == MessageDto.Action.ERROR) {
+         System.out.println(
+            "Error: " + messageDto.text
+         );
+      } else {
+         System.out.println(
+            messageDto.text
+         );
+      }
+
    }
 
 
@@ -77,14 +119,14 @@ public class Client {
       try {
          String serverHost = args[0];
          int serverPort = Integer.parseInt(args[1]);
+         String roomName = null;
 
+         // BufferedReader br = new BufferedReader(
+         //    new InputStreamReader(System.in)
+         // );
 
-         BufferedReader br = new BufferedReader(
-            new InputStreamReader(System.in)
-         );
-
-         System.out.print("Write room name: ");
-         String roomName = br.readLine();
+         // System.out.print("Write room name: ");
+         // String roomName = br.readLine();
 
          Client client = new Client(
             serverHost, 
