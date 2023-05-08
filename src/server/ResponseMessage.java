@@ -1,10 +1,13 @@
 package src.server;
 
+import src.shared.ChatCommands;
 import src.shared.MessageDto;
 
 public class ResponseMessage {
     public static MessageDto newRoomCreated(String room) {
-       return new MessageDto("New room '" + room + "' has been created, write '/leave' to leave the room")
+       return new MessageDto(
+            String.format("New room '" + room + "' has been created, write '%s' to leave the room", ChatCommands.QUIT)
+       )
           .addAction(MessageDto.Action.JOIN);
     }
  

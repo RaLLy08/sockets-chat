@@ -8,6 +8,7 @@ import java.net.*;
 
 import src.client.ChatCommandHandler.Command;
 import src.client.ConsoleReader.ConsoleSubsriber;
+import src.shared.ChatCommands;
 import src.shared.MessageDto;
 
 
@@ -28,7 +29,11 @@ public class Client extends ConsoleSubsriber {
          socket.getOutputStream()
       );
 
-      System.out.print("Enter text to send message to the lobby\nWrite '/connect <room>' to connect or create the room.\n");
+      System.out.println(
+         String.format(
+            "Enter text to send message to the lobby\nWrite '%s <room>' to join or create the room.\n", ChatCommands.JOIN
+         )
+      );
 
       this.room = room;
    }
