@@ -230,12 +230,42 @@ public class Server extends Thread {
             this.revokeRoom();
          } else if (messageDto.action == MessageDto.Action.MESSAGE) {
             this.broadcast(messageDto);
-         } else {
+         } else if (messageDto.action == MessageDto.Action.GET_ROOM_LIST) {
+            this.sendMessage(
+               ResponseMessage.listRooms(
+                  ClientHandler.clientHandlersRooms.keySet().toString()
+               )
+            );
+         } else if (messageDto.action == MessageDto.Action.GET_ROOM_MEMBERS) {
+            HashSet<ClientHandler> roomClientHandlers = this.getRoomClientHandlers();
+
+            if (roomClientHandlers == null) {
+               this.sendMessage(
+                  ResponseMessage.roomNotProvided()
+               );
+               return;
+            }
+
+            this.sendMessage(
+               ResponseMessage.listRoomMembers(
+                  Arrays.toString(roomClientHandlers.stream()
+                  .map(ClientHandler::remoteSocketAddress)
+                  .toArray(String[]::new))
+               )
+            );
+         }
+         
+         else {
             this.sendMessage(
                ResponseMessage.invalidAction()
             );
          }
 
+      }
+
+
+      String remoteSocketAddress() {
+         return this.remoteSocketAddress;
       }
 
       @Override

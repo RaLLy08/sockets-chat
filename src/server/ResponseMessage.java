@@ -70,4 +70,14 @@ public class ResponseMessage {
  
        return new MessageDto(message).addAction(MessageDto.Action.LEAVE);
     }
+
+    public static MessageDto listRooms(String rooms) {
+       return new MessageDto("List of rooms: " + rooms)
+          .addAction(MessageDto.Action.GET_ROOM_LIST);
+    }
+
+    public static MessageDto listRoomMembers(String members) {
+       return new MessageDto("List of members: " + members)
+          .addAction(MessageDto.Action.GET_ROOM_MEMBERS);
+    }
  }

@@ -7,7 +7,9 @@ public class MessageDto implements Serializable {
       JOIN,
       LEAVE,
       MESSAGE,
-      ERROR
+      ERROR,
+      GET_ROOM_LIST,
+      GET_ROOM_MEMBERS,
    }
 
    public String text;

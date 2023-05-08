@@ -12,7 +12,6 @@ import src.shared.ChatCommands;
 import src.shared.MessageDto;
 
 
-
 public class Client extends ConsoleSubsriber {
    Socket socket;
    String room;
@@ -30,9 +29,7 @@ public class Client extends ConsoleSubsriber {
       );
 
       System.out.println(
-         String.format(
-            "Enter text to send message to the lobby\nWrite '%s <room>' to join or create the room.\n", ChatCommands.JOIN
-         )
+         "Enter text to send message to the lobby. List of commands: \n" + ChatCommands.getDocs()
       );
 
       this.room = room;
@@ -94,6 +91,24 @@ public class Client extends ConsoleSubsriber {
                )
             );
          } 
+
+         if (chatCommand == Command.ROOM_LIST) {
+            this.out.writeObject(
+               new MessageDto(
+                  this.room,
+                  MessageDto.Action.GET_ROOM_LIST
+               )
+            );
+         }
+
+         if (chatCommand == Command.USER_LIST) {
+            this.out.writeObject(
+               new MessageDto(
+                  this.room,
+                  MessageDto.Action.GET_ROOM_MEMBERS
+               )
+            );
+         }
 
       } catch (IOException e) {
          e.printStackTrace();

@@ -4,8 +4,10 @@ import src.shared.ChatCommands;
 
 public class ChatCommandHandler {
     public static enum Command {
-       JOIN,
-       QUIT
+      JOIN,
+      QUIT,
+      ROOM_LIST,
+      USER_LIST,
     }
     static public boolean isCommand(String text) {
        return text.startsWith("/");
@@ -31,9 +33,12 @@ public class ChatCommandHandler {
           return Command.JOIN;
        } else if (command.equals(ChatCommands.QUIT)) {
           return Command.QUIT;
-       } else {
-          return null;
+       } else if (command.equals(ChatCommands.ROOM_LIST)) {
+          return Command.ROOM_LIST;
+       } else if (command.equals(ChatCommands.USER_LIST)) {
+          return Command.USER_LIST;
        }
+      return null;
     }
  
     String getParam() {
