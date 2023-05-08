@@ -1,20 +1,37 @@
 package src.client;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.*;
 
-import src.dto.MessageDto;
+import src.client.ChatCommandHandler.Command;
+import src.client.ConsoleReader.ConsoleSubsriber;
+import src.shared.MessageDto;
 
-import java.io.*;
 
-class ChatCommands {
-   static final String JOIN = "/join";
-   static final String QUIT = "/quit";
-}
 
-public class Client {
+public class Client extends ConsoleSubsriber {
    Socket socket;
-   BufferedReader br;  
    String room;
+   ObjectOutputStream out;
+
+   Client(String host, int port, String room) throws IOException {
+      this.socket = new Socket(
+         host,
+         port
+      );
+      System.out.println("Connected to: " + socket.getRemoteSocketAddress());
+
+      out = new ObjectOutputStream(
+         socket.getOutputStream()
+      );
+
+      System.out.print("Enter text to send message to the lobby\nWrite '/connect <room>' to connect or create the room.\n");
+
+      this.room = room;
+   }
 
    public void consumeMessages() {
       System.out.println("MessageConsumerThread started");
@@ -37,62 +54,49 @@ public class Client {
 
    }
 
-   public void sendMessages() {
+   public void onInputText(String text) {
       try {
-         System.out.println("Connected to: " + socket.getRemoteSocketAddress());
-
-         OutputStream outputStream = socket.getOutputStream();
-         ObjectOutputStream out = new ObjectOutputStream(
-            outputStream
+         this.out.writeObject(
+            new MessageDto(
+               this.room,
+               text,
+               MessageDto.Action.MESSAGE
+            )  
          );
-
-         br = new BufferedReader(
-            new InputStreamReader(System.in)
-         );
-         System.out.print("Enter text to send message to the lobby\nWrite '/connect <room>' to connect or create the room.\n");
-
-         while (true) {
-            String text = br.readLine();
-
-            if (text == null) continue;
-
-            MessageDto messageDto;
-
-            String[] parts = text.split("\\s+");
-
-            if (parts[0].equals("/connect")) {
-               this.room = parts[1];
-
-               messageDto = new MessageDto(
-                  this.room,
-                  MessageDto.Action.JOIN
-               );
-            } else if (parts[0].equals("/leave")) {
-               messageDto = new MessageDto(
-                  this.room,
-                  MessageDto.Action.LEAVE
-               );
-            } else {
-               messageDto = new MessageDto(
-                  this.room,
-                  text,
-                  MessageDto.Action.MESSAGE
-               );
-            }
-
-            out.writeObject(
-               messageDto
-            );
-         }
-
-         // socket.close();
       } catch (IOException e) {
          e.printStackTrace();
       }
    }
 
-   void handleMessage(MessageDto messageDto) {
 
+   public void onInputCommand(Command chatCommand, String param) {
+      try {
+
+         if (chatCommand == Command.JOIN) {
+            this.out.writeObject(
+               new MessageDto(
+                  param, // room
+                  MessageDto.Action.JOIN
+               )
+            );
+         } 
+         
+         if (chatCommand == Command.QUIT) {
+            this.out.writeObject(
+               new MessageDto(
+                  this.room,
+                  MessageDto.Action.LEAVE
+               )
+            );
+         } 
+
+      } catch (IOException e) {
+         e.printStackTrace();
+      }
+   }
+
+
+   void handleMessage(MessageDto messageDto) {
       if (messageDto.action == MessageDto.Action.ERROR) {
          System.out.println(
             "Error: " + messageDto.text
@@ -102,18 +106,7 @@ public class Client {
             messageDto.text
          );
       }
-
    }
-
-
-   Client(String host, int port, String room) throws IOException {
-      this.socket = new Socket(
-         host,
-         port
-      );
-      this.room = room;
-   }
-
 
    public static void main(String [] args) {
       try {
@@ -121,12 +114,6 @@ public class Client {
          int serverPort = Integer.parseInt(args[1]);
          String roomName = null;
 
-         // BufferedReader br = new BufferedReader(
-         //    new InputStreamReader(System.in)
-         // );
-
-         // System.out.print("Write room name: ");
-         // String roomName = br.readLine();
 
          Client client = new Client(
             serverHost, 
@@ -135,10 +122,11 @@ public class Client {
          );
 
          Thread messageConsumerThread = new Thread(() -> client.consumeMessages());
-         Thread messageSenderThread = new Thread(() -> client.sendMessages());
+         Thread consoleReader = new ConsoleReader(client);
 
          messageConsumerThread.start();
-         messageSenderThread.start();
+         consoleReader.start();
+
       }  catch (IOException e) {
          e.printStackTrace();
       }

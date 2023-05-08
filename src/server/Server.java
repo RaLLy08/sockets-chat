@@ -4,7 +4,8 @@ import java.net.*;
 import java.util.*;
 import java.io.*;
 
-import src.dto.MessageDto;
+import src.shared.MessageDto;
+
 
 
 public class Server extends Thread {
@@ -90,13 +91,7 @@ public class Server extends Thread {
                clientHandler.sendMessage(messageDto);
             } else {
                System.out.println(
-                  String.format(
-                     "Sending message to client: %s. \n room: %s \n text: %s \n action: %s", 
-                     this.remoteSocketAddress, 
-                     this.room,
-                     messageDto.text,
-                     messageDto.action
-                  )
+                  new MessageDto(this.room, messageDto.text, this.remoteSocketAddress, messageDto.action)
                );
             }
          }
@@ -106,29 +101,23 @@ public class Server extends Thread {
          HashSet<ClientHandler> roomClientHandlers = this.getRoomClientHandlers();
 
          if (roomClientHandlers == null) {
-            System.out.println("New room has been created: " + room);
+            System.out.println("New room has been created: " + this.room);
             this.sendMessage(
-               new MessageDto("New room '" + room + "' has been created, write '/leave' to leave the room")
-                  .addAction(MessageDto.Action.JOIN)
+               ResponseMessage.newRoomCreated(this.room)
             );
 
             roomClientHandlers = new HashSet<>();
          } else {
-            String message = String.format(
-               "%s Joined to room. Number of users in room: %d", 
-               this.remoteSocketAddress,
-               roomClientHandlers.size() + 1
-            );
+
             this.sendMessage(
-               new MessageDto("You have joined to '" + room + "' room write '/leave' to leave the room")
-                  .addAction(MessageDto.Action.JOIN)
+               ResponseMessage.joinedRoom(this.room)
             );
             this.broadcast(
-               new MessageDto(message)
-                  .addAction(MessageDto.Action.JOIN)
+               ResponseMessage.broadcastJoinRoom(
+                  this.remoteSocketAddress,
+                  roomClientHandlers.size() + 1
+               )
             );
-
-            System.out.println(message);
          }
 
          roomClientHandlers.add(this);
@@ -137,7 +126,9 @@ public class Server extends Thread {
 
       void addToLobby() {
          if (ClientHandler.clientHandlersLobby.contains(this)) {
-            this.sendError("Client is already in the lobby");
+            this.sendMessage(
+               ResponseMessage.clientAlreadyInLobby().addRoom(this.room)
+            );
             return;
          }
 
@@ -155,17 +146,13 @@ public class Server extends Thread {
          clientHandlersRooms.put(this.room, roomClientHandlers);
 
          this.sendMessage(
-            new MessageDto("You have left the room")
-               .addAction(MessageDto.Action.LEAVE)
+            ResponseMessage.leftRoom()
          );
          this.broadcast(
-            new MessageDto(
-               String.format(
-               "%s Left the room. Number of users in room: %d", 
-                  this.remoteSocketAddress,
-                  roomClientHandlers.size()
-               ))
-               .addAction(MessageDto.Action.LEAVE)
+            ResponseMessage.broadcastLeaveRoom(
+               this.remoteSocketAddress,
+               roomClientHandlers.size()
+            )
          );
       }
 
@@ -176,13 +163,7 @@ public class Server extends Thread {
       void sendMessage(MessageDto messageDto) {
          try {
             System.out.println(
-               String.format(
-                  "Sending message to client %s. \n room: %s \n text: %s \n action: %s", 
-                  messageDto.remoteSocketAddress, 
-                  messageDto.room,
-                  messageDto.text,
-                  messageDto.action
-               )
+               messageDto
             );
             // overriding the room and remoteSocketAddress
             messageDto.room = this.room;
@@ -202,22 +183,22 @@ public class Server extends Thread {
          }
       }
 
-      void sendError(String text) {
-         this.sendMessage(new MessageDto(this.room, text, MessageDto.Action.ERROR));
-      }
-
       void setRoom(String room) {
          this.room = room;
       }
 
       void assignToRoom(String room) {
          if (room == null) {
-            this.sendError("Room is not provided");
+            this.sendMessage(
+               ResponseMessage.roomNotProvided()
+            );
             return;
          }
 
          if (this.room != null) {
-            this.sendError("Room is already set");
+            this.sendMessage(
+               ResponseMessage.roomAlreadySet()
+            );
             return;
          }
 
@@ -227,7 +208,9 @@ public class Server extends Thread {
 
       void revokeRoom() {
          if (this.room == null) {
-            this.sendError("You are not in a room");
+            this.sendMessage(
+               ResponseMessage.notInRoom()
+            );
             
             return;
          }
@@ -248,7 +231,9 @@ public class Server extends Thread {
          } else if (messageDto.action == MessageDto.Action.MESSAGE) {
             this.broadcast(messageDto);
          } else {
-            this.sendError("Unknown message type");
+            this.sendMessage(
+               ResponseMessage.invalidAction()
+            );
          }
 
       }
