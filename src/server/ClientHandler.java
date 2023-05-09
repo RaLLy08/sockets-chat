@@ -187,7 +187,6 @@ public class ClientHandler extends Thread {
     }
 
     private void handleMessage(MessageDto messageDto) {
-       this.remoteSocketAddress = this.socket.getRemoteSocketAddress().toString();
 
        if (messageDto.action == MessageDto.Action.JOIN) {
           this.removeFromLobby();
@@ -240,6 +239,8 @@ public class ClientHandler extends Thread {
        System.out.println("Connected to: " + this.socket.getRemoteSocketAddress());
 
        this.addToLobby();
+
+       this.remoteSocketAddress = this.socket.getRemoteSocketAddress().toString();
 
        while (true) {
           try {
